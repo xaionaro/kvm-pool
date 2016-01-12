@@ -1,0 +1,191 @@
+.\" Sorry for my English 
+.\" --Dmitry Yu Okunev <dyokunev@ut.mephi.ru> 0x8E30679C
+
+.TH KVM-POOL 1 "JANURAY 2016" Linux "User Manuals"
+
+.SH NAME
+kvm-pool \- utility to manage KVM (Kernel Virtual Machine) instances as a pool for rdesktop.
+.SH SYNOPSIS
+.B kvm-pool [ ... ] \-\- [ kvm\-arguments ]
+.SH DESCRIPTION
+.B kvm-pool
+creates a pool of virtual machines using KVM (via
+.BR libvirt ),
+listens specified port and proxies connections to instances of the pool.
+
+.SH OPTIONS
+
+This options can be passed as arguments or to be used in the configuration
+file.
+
+To disable numeric option set to zero:
+.RS
+	=0
+.RE
+
+To disable string option (for example path to file) set to empty string:
+.RS
+	=
+.RE
+
+Also you can use previously set values while setting new options. Substring
+.IR %option_name%
+will be substituted with previously set value of option
+.IR option_name .
+(see 
+.BR "CONFIGURATION FILE" )
+
+To set
+.I kvm\-arguments
+in config file use '\-\-'. An example:
+.RS
+\-\- = \-net nic \-net tap \-boot n \-m 512
+.RE
+ 
+.B \-c, \-\-config\-file
+.I path
+.RS
+Sets path to the config file (see
+.BR "CONFIGURATION FILE" ).
+
+Default: "".
+.PP
+.RE
+ 
+.B \-K, \-\-config\-group
+.I string
+.RS
+Sets configuration group name (see
+.BR "CONFIGURATION FILE" ).
+
+Default: "default".
+.PP
+.RE
+ 
+.B \-m, \-\-min\-vms
+.I number
+.RS
+Minimal number of running virtual machines.
+
+Default: 0.
+.PP
+.RE
+
+.B \-M, \-\-max\-vms
+.I number
+.RS
+Maximal number of running virtual machines.
+
+Default: 64.
+.PP
+.RE
+
+.B \-s, \-\-min\-spare
+.I number
+.RS
+Minimal number of spare (idle) virtual machines.
+
+Default: 1.
+.PP
+.RE
+
+.B \-S, \-\-max\-spare
+.I number
+.RS
+Maximal number of spare (idle) virtual machines.
+
+Default: 8.
+.PP
+.RE
+
+.B \-r, \-\-kill\-vm\-on\-disconnect
+.I [0|1]
+.RS
+Kill the VM if the client disconnected. It's to prevent getting session of a
+one user by another one.
+
+Default: 1.
+.PP
+.RE
+
+
+.B \-L, \-\-listen
+.I host:port
+.RS
+Which port to listen for incoming rdesktop connections.
+
+Default: 0.0.0.0:3389.
+.PP
+.RE
+
+.SH CONFIGURATION FILE
+
+.B kvm-pool
+supports configuration file.
+
+By default
+.B kvm-pool
+tries to read next files (in specified order):
+.RS
+~/.kvm-pool.conf
+.br
+/etc/kvm-pool/kvm-pool.conf
+.RE
+
+This may be overrided with option
+.IR \-\-config\-file .
+
+.B kvm-pool
+reads only one configuration file. In other words, if option
+.I \-\-config\-file
+is not set and file
+.B ~/.kvm-pool.conf
+is accessible and parsable,
+.B kvm-pool
+will not try to open
+.BR /etc/kvm-pool/kvm-pool.conf .
+Command line options have precedence over config file options.
+
+Configuration file is parsed with glib's g_key_file_* API. That means,
+that config should consits from groups of key-value lines as in the
+example:
+.RS
+[default]
+.br
+max\-vms   = 16
+.br
+min\-spare = 2
+.br
+
+.br
+[laboratory]
+.br
+config\-group\-inherits = default
+.br
+\-\-        = \-net nic \-net tap \-boot n \-m 512
+.br
+min\-spare = 4
+.RE
+
+In this example there're 2 groups are set - "default" and "laboratory".
+And the group "laboratory" inherited setup of the group "default" except options "min-spare".
+
+By default
+.B kvm-pool
+uses group with name "default". The group name can be set by option
+.IR \-\-config\-group .
+
+
+.SH EXAMPLES
+
+.B Getting a pool of virtual machines booted using PXE with 512MB RAM:
+.RS
+kvm-pool \-\- \-net nic \-net tap \-boot n \-m 512
+.RE
+
+.RE
+.SH AUTHOR
+Dmitry Yu Okunev <dyokunev@ut.mephi.ru> 0x8E30679C
+.SH "SEE ALSO"
+.BR kvm (1)
+
