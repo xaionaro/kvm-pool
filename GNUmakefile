@@ -7,23 +7,26 @@ EXAMPLES ?= yes
 
 CSECFLAGS ?= -fstack-protector-all -Wall --param ssp-buffer-size=4 -D_FORTIFY_SOURCE=2 -fstack-check -DPARANOID -std=gnu99
 CFLAGS ?= -pipe -O2
-CFLAGS += $(CSECFLAGS) -fpic
-DEBUGCFLAGS ?= -pipe -Wall -ggdb3 -export-dynamic -Wno-error=unused-variable -O0 -pipe $(CSECFLAGS) -fpic
+CFLAGS += $(CSECFLAGS) $(shell pkg-config --cflags glib-2.0)
+DEBUGCFLAGS ?= -pipe -Wall -ggdb3 -export-dynamic -Wno-error=unused-variable -O0 -pipe $(CSECFLAGS)
 
 CARCHFLAGS ?= -march=native
 
 LIBS :=
 LDSECFLAGS ?= -Xlinker -zrelro
-LDFLAGS += $(LDSECFLAGS) -pthread -shared
+LDFLAGS += $(LDSECFLAGS) -pthread $(shell pkg-config --libs glib-2.0)
 INC := $(INC)
 
 INSTDIR = $(DESTDIR)$(PREFIX)
 
 objs=\
-main.o\
+malloc.o\
+error.o\
+pthreadex.o\
 kvm-pool.o\
+main.o\
 
-binary=kvm-pool.so
+binary=kvm-pool
 
 .PHONY: doc
 
@@ -41,6 +44,7 @@ clean:
 	rm -f $(binary) *.o test
 
 distclean: clean
+	rm -f *.orig
 
 doc:
 	doxygen .doxygen
@@ -69,4 +73,7 @@ debugtest: debug
 
 dotest: test
 	LD_LIBRARY_PATH=. ./test
+
+format:
+	astyle --style=linux --indent=tab --indent-cases --indent-switches --indent-preproc-define --break-blocks --pad-oper --pad-paren --delete-empty-lines *.c *.h | grep -v Unchanged || true¶
 

@@ -1,0 +1,3 @@
+*.orig
+kvm-pool
+*.o
