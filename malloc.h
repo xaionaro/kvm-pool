@@ -21,6 +21,7 @@
 #define __KVMPOOL_MALLOC_H
 
 #include <sys/types.h>
+#include <stdlib.h>
 
 extern void *xmalloc ( size_t size );
 extern void *xcalloc ( size_t nmemb, size_t size );

@@ -80,12 +80,18 @@ enum state_enum {
 };
 typedef enum state_enum state_t;
 
+struct vm {
+	pid_t	pid;
+	int	client_id;
+};
+typedef struct vm vm_t;
+
 struct ctx {
 	volatile state_t state;
 
-	pid_t  pid;
-	char   pid_str[65];
-	size_t pid_str_len;
+	pid_t		 pid;
+	char		 pid_str[65];
+	size_t		 pid_str_len;
 
 	char		*config_path;
 	const char	*config_group;
@@ -94,6 +100,11 @@ struct ctx {
 	int		 vms_max;
 	int		 vms_spare_min;
 	int		 vms_spare_max;
+	vm_t		*vms;
+	int		 vms_count;
+	int		 vms_spare_count;
+
+	char		 listen_addr[256];
 
 	kvm_args_t kvm_args[SHARGS_MAX];
 

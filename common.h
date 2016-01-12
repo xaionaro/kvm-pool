@@ -25,6 +25,7 @@
 #include "macros.h"
 
 #define _DEBUG_SUPPORT
+#define _DEBUG_FORCE
 
 #define PROGRAM "kvm-pool"
 #define REVISION ""
@@ -38,6 +39,14 @@
 
 #define OUTPUT_LOCK_TIMEOUT             (100*1000*1000)
 #define WAITPID_TIMED_GRANULARITY        (30*1000*1000)
+
+#define KVM "kvm"
+
+#define DEFAULT_VMS_MIN 1
+#define DEFAULT_VMS_MAX 64
+#define DEFAULT_VMS_SPARE_MIN 1
+#define DEFAULT_VMS_SPARE_MAX 8
+#define DEFAULT_KILL_ON_DISCONNECT 1
 
 #define SYSLOG_BUFSIZ                   (1<<16)
 #define SYSLOG_FLAGS                    (LOG_PID|LOG_CONS)

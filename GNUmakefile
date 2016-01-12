@@ -75,5 +75,5 @@ dotest: test
 	LD_LIBRARY_PATH=. ./test
 
 format:
-	astyle --style=linux --indent=tab --indent-cases --indent-switches --indent-preproc-define --break-blocks --pad-oper --pad-paren --delete-empty-lines *.c *.h | grep -v Unchanged || true¶
+	astyle --style=linux --indent=tab --indent-cases --indent-switches --indent-preproc-define --break-blocks --pad-oper --pad-paren --delete-empty-lines *.c *.h | grep -v Unchanged || true
 

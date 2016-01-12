@@ -4,7 +4,7 @@
 .TH KVM-POOL 1 "JANURAY 2016" Linux "User Manuals"
 
 .SH NAME
-kvm-pool \- utility to manage KVM (Kernel Virtual Machine) instances as a pool for rdesktop.
+kvm-pool \- utility to manage KVM (Kernel Virtual Machine) instances as a pool for VNC.
 .SH SYNOPSIS
 .B kvm-pool [ ... ] \-\- [ kvm\-arguments ]
 .SH DESCRIPTION
@@ -112,9 +112,9 @@ Default: 1.
 .B \-L, \-\-listen
 .I host:port
 .RS
-Which port to listen for incoming rdesktop connections.
+Which port to listen for incoming VNC connections.
 
-Default: 0.0.0.0:3389.
+Default: 0.0.0.0:5900.
 .PP
 .RE
 

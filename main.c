@@ -30,6 +30,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <glib.h>
+#include <string.h>
 
 #include "ctx.h"
 
@@ -510,6 +511,10 @@ static int parse_parameter ( ctx_t *ctx_p, uint16_t param_id, char *arg, paramso
 			ctx_p->vms_spare_max	= ( unsigned int ) xstrtol ( arg, &ret );
 			break;
 
+		case LISTEN:
+			strncpy(ctx_p->listen_addr, arg, sizeof(ctx_p->listen_addr)-1);
+			break;
+
 		default:
 			if ( arg == NULL )
 				ctx_p->flags[param_id]++;
@@ -693,6 +698,40 @@ int ctx_check ( ctx_t *ctx_p )
 	}
 
 #endif
+
+	if ( ctx_p->vms_min < 0 ) {
+		ret = errno = EINVAL;
+		error ( "required: min-vms >= 0" );
+	}
+	if ( ctx_p->vms_spare_min < 0 ) {
+		ret = errno = EINVAL;
+		error ( "required: min-spare >= 0" );
+	}
+	if ( ctx_p->vms_max < 1 ) {
+		ret = errno = EINVAL;
+		error ( "required: max-vms >= 1" );
+	}
+
+	if ( ctx_p->vms_min > ctx_p->vms_max ) {
+		ret = errno = EINVAL;
+		error ( "required: min-vms <= max-vms" );
+	}
+
+	if ( ctx_p->vms_spare_min > ctx_p->vms_spare_max ) {
+		ret = errno = EINVAL;
+		error ( "required: min-spare <= max-spare" );
+	}
+
+	if ( ctx_p->vms_spare_min > ctx_p->vms_min ) {
+		ret = errno = EINVAL;
+		error ( "required: min-spare <= min-vms" );
+	}
+
+	if ( ctx_p->vms_spare_max > ctx_p->vms_max ) {
+		ret = errno = EINVAL;
+		error ( "required: max-spare <= max-vms" );
+	}
+
 	return ret;
 }
 
@@ -841,6 +880,11 @@ int main ( int _argc, char *_argv[] )
 	int ret = 0, nret;
 	//SAFE ( posixhacks_init(), errno = ret = _SAFE_rc );
 	ctx_p->config_group			 = DEFAULT_CONFIG_GROUP;
+	ctx_p->vms_min				 = DEFAULT_VMS_MIN;
+	ctx_p->vms_max				 = DEFAULT_VMS_MAX;
+	ctx_p->vms_spare_min			 = DEFAULT_VMS_SPARE_MIN;
+	ctx_p->vms_spare_max			 = DEFAULT_VMS_SPARE_MAX;
+	ctx_p->flags[KILL_ON_DISCONNECT]	 = DEFAULT_KILL_ON_DISCONNECT;
 	ncpus					 = sysconf ( _SC_NPROCESSORS_ONLN ); // Get number of available logical CPUs
 	memory_init();
 	ctx_p->pid				 = getpid();
@@ -898,7 +942,7 @@ int main ( int _argc, char *_argv[] )
 
 	// == RUNNING ==
 	if ( ret == 0 )
-		ret = kvmpool_start ( ctx_p );
+		ret = kvmpool ( ctx_p );
 
 	// == /RUNNING ==
 	main_cleanup ( ctx_p );

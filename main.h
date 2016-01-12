@@ -1,8 +1,7 @@
 /*
-    kvm-pool  -  utility  to  manage  KVM (Kernel Virtual Machine)
-    instances as a pool for rdesktop.
+    clsync - file tree sync utility based on fanotify and inotify
 
-    Copyright (C) 2016 Dmitry Yu Okunev <dyokunev@ut.mephi.ru> 0x8E30679C
+    Copyright (C) 2013  Dmitry Yu Okunev <dyokunev@ut.mephi.ru> 0x8E30679C
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -18,14 +17,18 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef __KVMPOOL_KVMPOOL_H
-#define __KVMPOOL_KVMPOOL_H
+#ifndef __KVMPOOL_MAIN_H
+#define __KVMPOOL_MAIN_H
 
-#include "common.h"
-
-#include "ctx.h"
-#include "malloc.h"
-
-extern int kvmpool ( ctx_t *ctx_p );
+extern char *parameter_expand (
+    ctx_t *ctx_p,
+    char *arg,
+    int exceptionflags,
+    int *macro_count_p,
+    int *expand_count_p,
+    const char * ( *parameter_get ) ( const char *variable_name, void *arg ),
+    void *parameter_get_arg
+);
+extern const char *parameter_get ( const char *variable_name, void *_ctx_p );
 
 #endif
