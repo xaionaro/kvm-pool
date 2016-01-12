@@ -69,13 +69,6 @@ enum state_enum {
 	STATE_EXIT      = 0,
 	STATE_STARTING,
 	STATE_RUNNING,
-	STATE_SYNCHANDLER_ERR,
-	STATE_REHASH,
-	STATE_PREEXIT,
-	STATE_TERM,
-	STATE_THREAD_GC,
-	STATE_INITSYNC,
-	STATE_HOLDON,
 	STATE_UNKNOWN
 };
 typedef enum state_enum state_t;
@@ -107,6 +100,7 @@ struct ctx {
 	int		 vms_spare_count;
 
 	char		 listen_addr[256];
+	int		 listen_fd;
 
 	kvm_args_t kvm_args[SHARGS_MAX];
 

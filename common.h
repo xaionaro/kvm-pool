@@ -47,10 +47,13 @@
 #define DEFAULT_VMS_SPARE_MIN 1
 #define DEFAULT_VMS_SPARE_MAX 8
 #define DEFAULT_KILL_ON_DISCONNECT 1
+#define DEFAULT_LISTEN "0.0.0.0:5900"
 
 #define SYSLOG_BUFSIZ                   (1<<16)
 #define SYSLOG_FLAGS                    (LOG_PID|LOG_CONS)
 #define SYSLOG_FACILITY                 LOG_DAEMON
+
+#define BACKLOG 10
 
 #define CONFIG_PATHS                    { ".kvm-pool.conf", "/etc/kvm-pool/kvm-pool.conf", "/etc/kvm-pool.conf", "/usr/local/etc/kvm-pool/kvm-pool.conf", "/usr/local/etc/kvm-pool.conf", NULL }
 
