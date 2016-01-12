@@ -26,6 +26,8 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 
 #include "kvm-pool.h"
 
@@ -60,7 +62,7 @@ static int newvncid ( ctx_t *ctx_p )
 		int i = 0;
 
 		while ( i < ctx_p->vms_count ) {
-			if ( ctx_p->vms[i].vnc_id+256 == new_vnc_id )
+			if ( ctx_p->vms[i].vnc_id + 256 == new_vnc_id )
 				break;
 
 			i++;
@@ -73,7 +75,7 @@ static int newvncid ( ctx_t *ctx_p )
 	}
 
 	critical_on ( new_vnc_id >= ctx_p->vms_max );
-	return new_vnc_id+256;
+	return new_vnc_id + 256;
 }
 
 static char **getargv ( ctx_t *ctx_p, kvm_args_t *args_p, int vnc_id )
@@ -177,25 +179,33 @@ int ipv4listen ( char *listen_addr )
 	critical_on ( setsockopt ( sockfd, SOL_SOCKET, SO_REUSEADDR, &itrue, sizeof ( int ) ) == -1 );
 	sin.sin_family		= AF_INET;
 	sin.sin_port		= htons ( port );
-	sin.sin_addr.s_addr	= htonl(INADDR_ANY);//inet_addr ( host );
+	sin.sin_addr.s_addr	= htonl ( INADDR_ANY ); //inet_addr ( host );
 	memset ( &sin.sin_zero, '\0', 8 );
 	critical_on ( bind ( sockfd, ( struct sockaddr * ) &sin, sizeof ( struct sockaddr ) ) == -1 )
 	critical_on ( listen ( sockfd, BACKLOG ) == -1 );
 	return sockfd;
 }
 
-vm_t *kvmpool_findsparevm (ctx_t *ctx_p) {
+vm_t *kvmpool_findsparevm ( ctx_t *ctx_p )
+{
 	return NULL;
 }
 
 int kvmpool_attach ( ctx_t *ctx_p, int client_fd )
 {
 	vm_t *vm = kvmpool_findsparevm ( ctx_p );
-
-	critical_on (vm == NULL);
-
+	critical_on ( vm == NULL );
 	vm->client_fd = client_fd;
+	return 0;
+}
 
+int kvmpool_closevm ( vm_t *vm )
+{
+	close ( vm->client_fd );
+	close ( vm->vnc_fd );
+	kill ( vm->pid, 9 );
+	int status = 0;
+	waitpid ( vm->pid, &status, 0 );
 	return 0;
 }
 
@@ -221,6 +231,13 @@ int kvmpool ( ctx_t *ctx_p )
 		critical_on ( kvmpool_attach ( ctx_p, client_fd ) );
 	}
 
+	int i = 0;
+
+	while ( i < ctx_p->vms_count )
+		kvmpool_closevm ( &ctx_p->vms[i++] );
+
+	ctx_p->state = STATE_EXIT;
+	close ( ctx_p->listen_fd );
 	free ( ctx_p->vms );
 	ctx_p->vms = NULL;
 	debug ( 2, "finish" );

@@ -886,7 +886,7 @@ int main ( int _argc, char *_argv[] )
 	ctx_p->vms_max				 = DEFAULT_VMS_MAX;
 	ctx_p->vms_spare_min			 = DEFAULT_VMS_SPARE_MIN;
 	ctx_p->vms_spare_max			 = DEFAULT_VMS_SPARE_MAX;
-	strncpy(ctx_p->listen_addr, strdup(DEFAULT_LISTEN), 256);
+	strncpy ( ctx_p->listen_addr, strdup ( DEFAULT_LISTEN ), 256 );
 	ctx_p->flags[KILL_ON_DISCONNECT]	 = DEFAULT_KILL_ON_DISCONNECT;
 	ncpus					 = sysconf ( _SC_NPROCESSORS_ONLN ); // Get number of available logical CPUs
 	memory_init();
