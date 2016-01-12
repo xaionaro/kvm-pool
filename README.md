@@ -1,4 +1,4 @@
-Main repository: (https://devel.mephi.ru/dyokunev/kvm-pool)[https://devel.mephi.ru/dyokunev/kvm-pool]
+Main repository: https://devel.mephi.ru/dyokunev/kvm-pool
 
 ```
 NAME
