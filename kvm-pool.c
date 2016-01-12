@@ -201,11 +201,18 @@ int kvmpool_attach ( ctx_t *ctx_p, int client_fd )
 
 int kvmpool_closevm ( vm_t *vm )
 {
-	close ( vm->client_fd );
+	if ( vm->client_fd ) {
+		close ( vm->client_fd );
+	}
+
 	close ( vm->vnc_fd );
-	kill ( vm->pid, 9 );
-	int status = 0;
-	waitpid ( vm->pid, &status, 0 );
+
+	if ( vm->pid ) {
+		kill ( vm->pid, 9 );
+		int status = 0;
+		waitpid ( vm->pid, &status, 0 );
+	}
+
 	return 0;
 }
 
@@ -236,6 +243,8 @@ int kvmpool ( ctx_t *ctx_p )
 	while ( i < ctx_p->vms_count )
 		kvmpool_closevm ( &ctx_p->vms[i++] );
 
+	ctx_p->vms_count = 0;
+	ctx_p->vms_spare_count = 0;
 	ctx_p->state = STATE_EXIT;
 	close ( ctx_p->listen_fd );
 	free ( ctx_p->vms );
