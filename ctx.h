@@ -82,7 +82,9 @@ typedef enum state_enum state_t;
 
 struct vm {
 	pid_t	pid;
-	int	client_id;
+	int	vnc_id;
+	int	vnc_fd;
+	int	client_fd;
 };
 typedef struct vm vm_t;
 

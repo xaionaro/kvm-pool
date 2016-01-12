@@ -512,7 +512,7 @@ static int parse_parameter ( ctx_t *ctx_p, uint16_t param_id, char *arg, paramso
 			break;
 
 		case LISTEN:
-			strncpy(ctx_p->listen_addr, arg, sizeof(ctx_p->listen_addr)-1);
+			strncpy ( ctx_p->listen_addr, arg, sizeof ( ctx_p->listen_addr ) - 1 );
 			break;
 
 		default:
@@ -703,10 +703,12 @@ int ctx_check ( ctx_t *ctx_p )
 		ret = errno = EINVAL;
 		error ( "required: min-vms >= 0" );
 	}
+
 	if ( ctx_p->vms_spare_min < 0 ) {
 		ret = errno = EINVAL;
 		error ( "required: min-spare >= 0" );
 	}
+
 	if ( ctx_p->vms_max < 1 ) {
 		ret = errno = EINVAL;
 		error ( "required: max-vms >= 1" );
