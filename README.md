@@ -1,3 +1,5 @@
+Main repository: (https://devel.mephi.ru/dyokunev/kvm-pool)[https://devel.mephi.ru/dyokunev/kvm-pool]
+
 ```
 NAME
        kvm-pool  -  utility  to  manage  KVM (Kernel Virtual Machine) instances as a pool for
