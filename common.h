@@ -24,6 +24,7 @@
 
 #include "macros.h"
 
+//#define USE_SPLICE	// Don't use this option, doesn't work: splice cannot be used for tcp->tcp: http://stackoverflow.com/questions/7084254/linux-splice-returning-einval-invalid-argument
 #define _DEBUG_SUPPORT
 //#define _DEBUG_FORCE
 

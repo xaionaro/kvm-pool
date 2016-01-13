@@ -39,7 +39,7 @@ To set
 .I kvm\-arguments
 in config file use '\-\-'. An example:
 .RS
-\-\- = \-net nic \-net tap \-boot n \-m 512
+\-\- = \-net tap \-boot n \-m 512
 .RE
  
 .B \-c, \-\-config\-file
@@ -162,7 +162,7 @@ min\-spare = 2
 .br
 config\-group\-inherits = default
 .br
-\-\-        = \-net nic \-net tap \-boot n \-m 512
+\-\-        = \-net tap \-boot n \-m 512
 .br
 min\-spare = 4
 .RE
@@ -180,7 +180,7 @@ uses group with name "default". The group name can be set by option
 
 .B Getting a pool of virtual machines booted using PXE with 512MB RAM:
 .RS
-kvm-pool \-\- \-net nic \-net tap \-boot n \-m 512
+kvm-pool \-\- \-net tap \-boot n \-m 512
 .RE
 
 .RE

@@ -25,7 +25,7 @@ OPTIONS
        (see CONFIGURATION FILE)
 
        To set kvm-arguments in config file use '--'. An example:
-              -- = -net nic -net tap -boot n -m 512
+              -- = -net tap -boot n -m 512
 
        -c, --config-file path
               Sets path to the config file (see CONFIGURATION FILE).
@@ -90,7 +90,7 @@ CONFIGURATION FILE
 
               [laboratory]
               config-group-inherits = default
-              --        = -net nic -net tap -boot n -m 512
+              --        = -net tap -boot n -m 512
               min-spare = 4
 
        In  this example there're 2 groups are set - "default" and "laboratory".  And the group
@@ -101,7 +101,7 @@ CONFIGURATION FILE
 
 EXAMPLES
        Getting a pool of virtual machines booted using PXE with 512MB RAM:
-              kvm-pool -- -net nic -net tap -boot n -m 512
+              kvm-pool -- -net tap -boot n -m 512
 
 AUTHOR
        Dmitry Yu Okunev <dyokunev@ut.mephi.ru> 0x8E30679C

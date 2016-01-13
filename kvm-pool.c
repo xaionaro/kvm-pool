@@ -29,6 +29,9 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <pthread.h>
+#ifdef USE_SPLICE
+#	include <fcntl.h>
+#endif
 
 #include "kvm-pool.h"
 
@@ -54,6 +57,18 @@ static inline void argv_dump ( int debug_level, char **argv )
 
 	return;
 }
+
+#ifdef USE_SPLICE
+static inline int setsock_nonblock ( int sock )
+{
+	int flags;
+
+	if ( -1 == ( flags = fcntl ( sock, F_GETFL, 0 ) ) )
+		flags = 0;
+
+	return fcntl ( sock, F_SETFL, flags | O_NONBLOCK );
+}
+#endif
 
 static int newvncid ( ctx_t *ctx_p )
 {
@@ -103,6 +118,12 @@ static char **getargv ( ctx_t *ctx_p, kvm_args_t *args_p, int vnc_id )
 		char vncidstr[256];
 		snprintf ( vncidstr, 256, ":%i", vnc_id );
 		argv[d++] = strdup ( vncidstr );
+	}
+	argv[d++] = strdup ( "-net" );
+	{
+		char tapstr[256];
+		snprintf (tapstr, 256, "nic,macaddr=52:54:00:31:14:%02x", vnc_id-256);
+		argv[d++] = strdup ( tapstr );
 	}
 
 	while ( s < args_p->c ) {
@@ -219,6 +240,9 @@ int ipv4connect_s ( const char const *host, const uint16_t port ) // TODO: add s
 	dest.sin_addr.s_addr = htonl ( INADDR_LOOPBACK );
 	dest.sin_port = htons ( port );
 	SAFE ( connect ( sock, ( struct sockaddr * ) &dest, sizeof ( struct sockaddr ) ) < 0, return -1 );
+#ifdef USE_SPLICE
+	setsock_nonblock ( sock );
+#endif
 	return sock;
 }
 
@@ -279,8 +303,19 @@ static inline int passthrough_dataportion ( int dst, int src, char *buf )
 	debug ( 8, "passthrough_dataportion(%i, %i, buf)", dst, src );
 
 	while ( 1 ) {
-		int s;
-		debug ( 9,  "recv(%i, buf, %i, 0x%o)", src, KVMPOOL_NET_BUFSIZE, MSG_DONTWAIT );
+#ifdef USE_SPLICE
+		debug ( 9,  "splice(%i, NULL, %i, NULL, %i, 0x%x)", src, dst, KVMPOOL_NET_BUFSIZE, SPLICE_F_NONBLOCK );
+		r = splice ( src, NULL, dst, NULL, KVMPOOL_NET_BUFSIZE, SPLICE_F_NONBLOCK );
+		if (r == 0) {
+			error ( "unimplemented case while forwarding a data from %i to %i", src, dst );
+			return -1;
+		}
+		if (r < 0) {
+			error ( "got error while forwarding a data from %i to %i", src, dst );
+			return r;
+		}
+#else
+		debug ( 9,  "recv(%i, buf, %i, 0x%x)", src, KVMPOOL_NET_BUFSIZE, MSG_DONTWAIT );
 		errno = 0;
 		r = recv ( src, buf, KVMPOOL_NET_BUFSIZE, MSG_DONTWAIT );
 		debug ( 10, "recv() -> %i", r );
@@ -296,8 +331,11 @@ static inline int passthrough_dataportion ( int dst, int src, char *buf )
 			return r;
 		}
 
-		debug ( 9, "send(%i, buf, %i, 0x%o)", dst, r, MSG_DONTWAIT );
-		s = send ( dst, buf, r, MSG_DONTWAIT );
+		int s = 0;
+		while (s<r) {
+			debug ( 9, "send(%i, &buf[%i], %i, 0x%x)", dst, s, r-s, 0 );
+			s += send ( dst, &buf[s], r-s, 0 );
+		}
 
 		if ( s < 0 ) {
 			error ( "got error while sending to fd == %i", dst );
@@ -308,6 +346,8 @@ static inline int passthrough_dataportion ( int dst, int src, char *buf )
 			error ( "sent (%i) != received (%i)", s, r );
 			return -1;
 		}
+
+#endif
 	};
 
 	debug ( 9, "finish" );
@@ -480,6 +520,10 @@ int kvmpool ( ctx_t *ctx_p )
 				pthread_mutex_unlock ( &kvmpool_globalmutex );
 				continue;
 			}
+
+#ifdef USE_SPLICE
+		setsock_nonblock ( client_fd );
+#endif
 
 		if ( kvmpool_attach ( ctx_p, client_fd ) )
 			close ( client_fd );
