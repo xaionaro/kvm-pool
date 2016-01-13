@@ -8,7 +8,7 @@ SYNOPSIS
        kvm-pool [ ... ] -- [ kvm-arguments ]
 
 DESCRIPTION
-       kvm-pool  creates a pool of virtual machines using KVM (via libvirt), listens specified
+       kvm-pool  creates a pool of virtual machines using KVM, listens specified
        port and proxies connections to instances of the pool.
 
 OPTIONS
