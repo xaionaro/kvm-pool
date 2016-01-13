@@ -248,7 +248,7 @@ static inline int passthrough_dataportion ( int dst, int src, char *buf )
 
 	while ( 1 ) {
 		int s;
-		debug(9,  "recv()");
+		debug(9,  "recv(%i, buf, %i, 0x%o)", src, KVMPOOL_NET_BUFSIZE, MSG_DONTWAIT);
 		errno = 0;
 		r = recv ( src, buf, KVMPOOL_NET_BUFSIZE, MSG_DONTWAIT );
 		debug(10, "recv() -> %i", r);
@@ -264,7 +264,7 @@ static inline int passthrough_dataportion ( int dst, int src, char *buf )
 			return r;
 		}
 
-		debug(9, "send()");
+		debug(9, "send(%i, buf, %i, 0x%o)", dst, r, MSG_DONTWAIT);
 		s = send ( dst, buf, r, MSG_DONTWAIT );
 
 		if ( s < 0 ) {
@@ -344,6 +344,7 @@ int kvmpool_attach ( ctx_t *ctx_p, int client_fd )
 {
 	debug ( 3, "" );
 	vm_t *vm = kvmpool_findsparevm ( ctx_p );
+	ctx_p->vms_spare_count--;
 	critical_on ( vm == NULL );
 	vm->client_fd = client_fd;
 	vm->buf = xmalloc ( KVMPOOL_NET_BUFSIZE );
@@ -363,6 +364,8 @@ int kvmpool_gc ( ctx_t *ctx_p )
 
 		i++;
 	}
+
+	debug(5, "ctx_p->vms_count == %i; ctx_p->vms_spare_count == %i", ctx_p->vms_count, ctx_p->vms_spare_count);
 
 	return 0;
 }
