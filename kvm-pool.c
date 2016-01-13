@@ -166,7 +166,7 @@ int kvmpool_prepare_spare_vms ( ctx_t *ctx_p )
 	return 0;
 }
 
-int ipv4listen ( char *listen_addr )
+int ipv4listen ( char *listen_addr ) // TODO: add support of arbitrary hosts
 {
 	//char *host     = listen_addr;
 	char *port_str = strchr ( listen_addr, ':' );
@@ -189,6 +189,15 @@ int ipv4listen ( char *listen_addr )
 
 vm_t *kvmpool_findsparevm ( ctx_t *ctx_p )
 {
+	int i = 0;
+
+	while ( i < ctx_p->vms_count ) {
+		if ( ctx_p->vms[i].pid != 0 && ctx_p->vms[i].client_fd == 0 )
+			return &ctx_p->vms[i];
+
+		i++;
+	}
+
 	return NULL;
 }
 
@@ -224,29 +233,65 @@ static inline int passthrough_dataportion ( int dst, int src, char *buf )
 {
 	int r;
 
-	while (1) {
+	while ( 1 ) {
 		int s;
-
 		r = recv ( src, buf, KVMPOOL_NET_BUFSIZE, MSG_DONTWAIT );
 
-		if (r < 0)
+		if ( r < 0 )
 			return r;
 
-		if (r == 0)
+		if ( r == 0 )
 			break;
 
-		s = send(dst, buf, r, MSG_DONTWAIT);
+		s = send ( dst, buf, r, MSG_DONTWAIT );
 
-		if (s < 0)
+		if ( s < 0 )
 			return s;
+
+		if ( s != r )
+			return -1;
 	};
 
 	return 0;
 }
 
+int ipv4connect_s ( const char const *host, const uint16_t port ) // TODO: add support of arbitrary hosts
+{
+	struct sockaddr_in dest = {0};
+	int sock;
+	SAFE ( sock = socket ( AF_INET, SOCK_STREAM, 0 ) < 0, return -1 );
+	dest.sin_family = AF_INET;
+	dest.sin_addr.s_addr = htonl ( INADDR_LOOPBACK );
+	dest.sin_port = htons ( port );
+	SAFE ( connect ( sock, ( struct sockaddr * ) &dest, sizeof ( struct sockaddr ) ) < 0, return -1 );
+	return sock;
+}
+
 void *kvmpool_connectionhandler ( void *_vm )
 {
 	vm_t *vm = _vm;
+	debug ( 3, "" );
+	int client_fd;
+	int connect_try = 0;
+
+	while ( 1 ) {
+		client_fd = ipv4connect_s ( "127.0.0.1", vm->vnc_id + 256 + 5900 );
+
+		if ( client_fd > 0 )
+			break;
+
+		if ( connect_try > KVMPOOL_CONNECT_TIMEOUT ) {
+			error ( "Cannot connect to 127.0.0.1:%u", vm->vnc_id + 256 + 5900 );
+			client_fd = 0;
+			break;
+		}
+
+		sleep ( 1 );
+		connect_try++;
+	};
+
+	vm->client_fd = client_fd;
+
 	int max_fd = MAX ( vm->client_fd, vm->vnc_fd ) + 1;
 
 	while ( vm->client_fd && vm->vnc_fd ) {
@@ -271,12 +316,14 @@ void *kvmpool_connectionhandler ( void *_vm )
 				break;
 	}
 
+	debug ( 3, "finish" );
 	kvmpool_closevm ( vm );
 	return NULL;
 }
 
 int kvmpool_attach ( ctx_t *ctx_p, int client_fd )
 {
+	debug ( 3, "" );
 	vm_t *vm = kvmpool_findsparevm ( ctx_p );
 	critical_on ( vm == NULL );
 	vm->client_fd = client_fd;

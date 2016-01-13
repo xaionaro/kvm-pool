@@ -25,7 +25,7 @@
 #include "macros.h"
 
 #define _DEBUG_SUPPORT
-#define _DEBUG_FORCE
+//#define _DEBUG_FORCE
 
 #define PROGRAM "kvm-pool"
 #define REVISION ""
@@ -43,6 +43,7 @@
 #define KVM "kvm"
 
 #define KVMPOOL_NET_BUFSIZE (1<<20)
+#define KVMPOOL_CONNECT_TIMEOUT 15
 
 #define DEFAULT_VMS_MIN 1
 #define DEFAULT_VMS_MAX 64
