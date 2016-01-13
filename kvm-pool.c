@@ -28,6 +28,7 @@
 #include <arpa/inet.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <pthread.h>
 
 #include "kvm-pool.h"
 
@@ -191,26 +192,110 @@ vm_t *kvmpool_findsparevm ( ctx_t *ctx_p )
 	return NULL;
 }
 
-int kvmpool_attach ( ctx_t *ctx_p, int client_fd )
-{
-	vm_t *vm = kvmpool_findsparevm ( ctx_p );
-	critical_on ( vm == NULL );
-	vm->client_fd = client_fd;
-	return 0;
-}
-
 int kvmpool_closevm ( vm_t *vm )
 {
 	if ( vm->client_fd ) {
 		close ( vm->client_fd );
+		vm->client_fd = 0;
 	}
 
-	close ( vm->vnc_fd );
+	if ( vm->vnc_fd ) {
+		close ( vm->vnc_fd );
+		vm->vnc_fd = 0;
+	}
 
 	if ( vm->pid ) {
 		kill ( vm->pid, 9 );
 		int status = 0;
 		waitpid ( vm->pid, &status, 0 );
+		vm->pid = 0;
+	}
+
+	if ( vm->buf != NULL ) {
+		free ( vm->buf );
+		vm->buf = NULL;
+	}
+
+	memset ( vm, 0, sizeof ( *vm ) );
+	return 0;
+}
+
+static inline int passthrough_dataportion ( int dst, int src, char *buf )
+{
+	int r;
+
+	while (1) {
+		int s;
+
+		r = recv ( src, buf, KVMPOOL_NET_BUFSIZE, MSG_DONTWAIT );
+
+		if (r < 0)
+			return r;
+
+		if (r == 0)
+			break;
+
+		s = send(dst, buf, r, MSG_DONTWAIT);
+
+		if (s < 0)
+			return s;
+	};
+
+	return 0;
+}
+
+void *kvmpool_connectionhandler ( void *_vm )
+{
+	vm_t *vm = _vm;
+	int max_fd = MAX ( vm->client_fd, vm->vnc_fd ) + 1;
+
+	while ( vm->client_fd && vm->vnc_fd ) {
+		fd_set rfds;
+		FD_ZERO ( &rfds );
+		FD_SET ( vm->client_fd, &rfds );
+		FD_SET ( vm->vnc_fd, &rfds );
+		int sret = select ( max_fd, &rfds, NULL, NULL, NULL );
+
+		if ( !sret )
+			continue;
+
+		if ( sret < 0 )
+			break;
+
+		if ( FD_ISSET ( vm->client_fd, &rfds ) )
+			if ( passthrough_dataportion ( vm->vnc_fd, vm->client_fd, vm->buf ) )
+				break;
+
+		if ( FD_ISSET ( vm->vnc_fd, &rfds ) )
+			if ( passthrough_dataportion ( vm->client_fd, vm->vnc_fd, vm->buf ) )
+				break;
+	}
+
+	kvmpool_closevm ( vm );
+	return NULL;
+}
+
+int kvmpool_attach ( ctx_t *ctx_p, int client_fd )
+{
+	vm_t *vm = kvmpool_findsparevm ( ctx_p );
+	critical_on ( vm == NULL );
+	vm->client_fd = client_fd;
+	vm->buf = xmalloc ( KVMPOOL_NET_BUFSIZE );
+	pthread_create ( &vm->handler, NULL, kvmpool_connectionhandler, vm );
+	return 0;
+}
+
+int kvmpool_gc ( ctx_t *ctx_p )
+{
+	int i = 0;
+
+	while ( i < ctx_p->vms_count ) {
+		if ( ctx_p->vms[i].pid == 0 ) {
+			pthread_join ( ctx_p->vms[i].handler, NULL );
+			memcpy ( &ctx_p->vms[i], &ctx_p->vms[ctx_p->vms_count--], sizeof ( *ctx_p->vms ) );
+		}
+
+		i++;
 	}
 
 	return 0;
@@ -231,6 +316,8 @@ int kvmpool ( ctx_t *ctx_p )
 			warning ( "client_fd == %i", client_fd );
 			continue;
 		}
+
+		kvmpool_gc ( ctx_p );
 
 		if ( ctx_p->vms_spare_count == 0 )
 			critical_on ( kvmpool_runspare ( ctx_p ) );

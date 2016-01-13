@@ -74,10 +74,12 @@ enum state_enum {
 typedef enum state_enum state_t;
 
 struct vm {
-	pid_t	pid;
-	int	vnc_id;
-	int	vnc_fd;
-	int	client_fd;
+	pid_t		 pid;
+	int		 vnc_id;
+	int		 vnc_fd;
+	int		 client_fd;
+	pthread_t	 handler;
+	char		*buf;
 };
 typedef struct vm vm_t;
 

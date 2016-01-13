@@ -42,6 +42,8 @@
 
 #define KVM "kvm"
 
+#define KVMPOOL_NET_BUFSIZE (1<<20)
+
 #define DEFAULT_VMS_MIN 1
 #define DEFAULT_VMS_MAX 64
 #define DEFAULT_VMS_SPARE_MIN 1

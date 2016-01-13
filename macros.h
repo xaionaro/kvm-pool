@@ -1,6 +1,10 @@
 #ifndef __KVMPOOL_MACROS_H
 #define __KVMPOOL_MACROS_H
 
+#ifndef MAX
+#	define MAX(a, b) ((a)>(b)?(a):(b))
+#endif
+
 #ifdef _DEBUG
 #	define DEBUGV(...) __VA_ARGS__
 #else
