@@ -27,7 +27,7 @@
 #ifdef _DEBUG_FORCE
 #	define DEBUGLEVEL_LIMIT 255
 #else
-#	define DEBUGLEVEL_LIMIT 9
+#	define DEBUGLEVEL_LIMIT 20
 #endif
 
 extern void _critical ( const char *const function_name, const char *fmt, ... );

@@ -187,6 +187,18 @@ int ipv4listen ( char *listen_addr ) // TODO: add support of arbitrary hosts
 	return sockfd;
 }
 
+int ipv4connect_s ( const char const *host, const uint16_t port ) // TODO: add support of arbitrary hosts
+{
+	struct sockaddr_in dest = {0};
+	int sock;
+	SAFE ( (sock = socket ( AF_INET, SOCK_STREAM, 0 )) < 0, return -1 );
+	dest.sin_family = AF_INET;
+	dest.sin_addr.s_addr = htonl ( INADDR_LOOPBACK );
+	dest.sin_port = htons ( port );
+	SAFE ( connect ( sock, ( struct sockaddr * ) &dest, sizeof ( struct sockaddr ) ) < 0, return -1 );
+	return sock;
+}
+
 vm_t *kvmpool_findsparevm ( ctx_t *ctx_p )
 {
 	int i = 0;
@@ -232,57 +244,60 @@ int kvmpool_closevm ( vm_t *vm )
 static inline int passthrough_dataportion ( int dst, int src, char *buf )
 {
 	int r;
+	debug(8, "passthrough_dataportion(%i, %i, buf)", dst, src);
 
 	while ( 1 ) {
 		int s;
+		debug(9,  "recv()");
+		errno = 0;
 		r = recv ( src, buf, KVMPOOL_NET_BUFSIZE, MSG_DONTWAIT );
-
-		if ( r < 0 )
-			return r;
+		debug(10, "recv() -> %i", r);
 
 		if ( r == 0 )
+			return -1;
+
+		if (errno == EAGAIN)
 			break;
 
+		if ( r < 0 ) {
+			error("got error while receiving from fd == %i", src);
+			return r;
+		}
+
+		debug(9, "send()");
 		s = send ( dst, buf, r, MSG_DONTWAIT );
 
-		if ( s < 0 )
+		if ( s < 0 ) {
+			error("got error while sending to fd == %i", dst);
 			return s;
+		}
 
-		if ( s != r )
+		if ( s != r ) {
+			error("sent (%i) != received (%i)", s, r);
 			return -1;
+		}
 	};
 
+	debug(9, "finish");
 	return 0;
-}
-
-int ipv4connect_s ( const char const *host, const uint16_t port ) // TODO: add support of arbitrary hosts
-{
-	struct sockaddr_in dest = {0};
-	int sock;
-	SAFE ( sock = socket ( AF_INET, SOCK_STREAM, 0 ) < 0, return -1 );
-	dest.sin_family = AF_INET;
-	dest.sin_addr.s_addr = htonl ( INADDR_LOOPBACK );
-	dest.sin_port = htons ( port );
-	SAFE ( connect ( sock, ( struct sockaddr * ) &dest, sizeof ( struct sockaddr ) ) < 0, return -1 );
-	return sock;
 }
 
 void *kvmpool_connectionhandler ( void *_vm )
 {
 	vm_t *vm = _vm;
 	debug ( 3, "" );
-	int client_fd;
+	int vnc_fd = 0;
 	int connect_try = 0;
 
 	while ( 1 ) {
-		client_fd = ipv4connect_s ( "127.0.0.1", vm->vnc_id + 256 + 5900 );
+		vnc_fd = ipv4connect_s ( "127.0.0.1", vm->vnc_id + 5900 );
 
-		if ( client_fd > 0 )
+		if ( vnc_fd > 0 )
 			break;
 
 		if ( connect_try > KVMPOOL_CONNECT_TIMEOUT ) {
-			error ( "Cannot connect to 127.0.0.1:%u", vm->vnc_id + 256 + 5900 );
-			client_fd = 0;
+			error ( "Cannot connect to 127.0.0.1:%u", vm->vnc_id + 5900 );
+			vnc_fd = 0;
 			break;
 		}
 
@@ -290,16 +305,19 @@ void *kvmpool_connectionhandler ( void *_vm )
 		connect_try++;
 	};
 
-	vm->client_fd = client_fd;
+	vm->vnc_fd = vnc_fd;
 
 	int max_fd = MAX ( vm->client_fd, vm->vnc_fd ) + 1;
 
+	debug ( 3, "vm->client_fd == %i; vm->vnc_fd == %i", vm->client_fd, vm->vnc_fd );
 	while ( vm->client_fd && vm->vnc_fd ) {
 		fd_set rfds;
 		FD_ZERO ( &rfds );
 		FD_SET ( vm->client_fd, &rfds );
 		FD_SET ( vm->vnc_fd, &rfds );
+		debug(7, "select(): vm->client_fd == %i; vm->vnc_fd == %i", vm->client_fd, vm->vnc_fd);
 		int sret = select ( max_fd, &rfds, NULL, NULL, NULL );
+		debug(8, "select() -> %i", sret);
 
 		if ( !sret )
 			continue;
@@ -307,6 +325,7 @@ void *kvmpool_connectionhandler ( void *_vm )
 		if ( sret < 0 )
 			break;
 
+		debug(7, "FD_ISSET()s");
 		if ( FD_ISSET ( vm->client_fd, &rfds ) )
 			if ( passthrough_dataportion ( vm->vnc_fd, vm->client_fd, vm->buf ) )
 				break;
