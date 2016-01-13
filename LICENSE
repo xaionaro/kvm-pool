@@ -1,5 +1,5 @@
 Format: http://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
-Upstream-Name: clsync
+Upstream-Name: kvm-pool
 Source: https://devel.mephi.ru/dyokunev/kvm-pool
 
 Files: *

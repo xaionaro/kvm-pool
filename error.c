@@ -1,7 +1,8 @@
 /*
-    clsync - file tree sync utility based on inotify/kqueue
+    kvm-pool  -  utility  to  manage  KVM (Kernel Virtual Machine)
+    instances as a pool for rdesktop.
 
-    Copyright (C) 2013-2014 Dmitry Yu Okunev <dyokunev@ut.mephi.ru> 0x8E30679C
+    Copyright (C) 2016 Dmitry Yu Okunev <dyokunev@ut.mephi.ru> 0x8E30679C
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
