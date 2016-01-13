@@ -61,20 +61,32 @@ static int newvncid ( ctx_t *ctx_p )
 
 	while ( new_vnc_id < ctx_p->vms_max ) {
 		int i = 0;
+		int f = 0;
 
-		while ( i < ctx_p->vms_count ) {
-			if ( ctx_p->vms[i].vnc_id + 256 == new_vnc_id )
+		while ( f < ctx_p->vms_count ) {
+			debug ( 30, "i == %i; f == %i, ctx_p->vms_count == %i; new_vnc_id == %i, ctx_p->vms[%i].vnc_id == %i", i, f, ctx_p->vms_count, new_vnc_id, i, ctx_p->vms[i].vnc_id );
+
+			if ( ctx_p->vms[i].pid == 0 ) {
+				i++;
+				continue;
+			}
+
+			if ( ctx_p->vms[i].vnc_id == 256 + new_vnc_id )
 				break;
 
+			f++;
 			i++;
 		}
 
-		if ( i >= ctx_p->vms_count )
+		debug ( 28, "f == %i; ctx_p->vms_count == %i", f, ctx_p->vms_count );
+
+		if ( f >= ctx_p->vms_count )
 			break;
 
 		new_vnc_id++;
 	}
 
+	debug ( 20, "new_vnc_id + 256 == %i", new_vnc_id + 256 );
 	critical_on ( new_vnc_id >= ctx_p->vms_max );
 	return new_vnc_id + 256;
 }
@@ -134,9 +146,18 @@ static char **getargv ( ctx_t *ctx_p, kvm_args_t *args_p, int vnc_id )
 
 int kvmpool_runspare ( ctx_t *ctx_p )
 {
+	debug ( 4, "" );
+
+	if ( ctx_p->vms_count >= ctx_p->vms_max )
+		return ENOMEM;
+
 	int new_vnc_id = newvncid ( ctx_p );
-	vm_t *vm = &ctx_p->vms[ctx_p->vms_count++];
+	vm_t *vm = ctx_p->vms;
+
+	while ( vm->pid ) vm++;
+
 	ctx_p->vms_spare_count++;
+	ctx_p->vms_count++;
 	memset ( vm, 0, sizeof ( *vm ) );
 	vm->vnc_id = new_vnc_id;
 	vm->pid = fork();
@@ -156,6 +177,8 @@ int kvmpool_runspare ( ctx_t *ctx_p )
 
 int kvmpool_prepare_spare_vms ( ctx_t *ctx_p )
 {
+	debug ( 18, "" );
+
 	while ( ctx_p->vms_spare_count < ctx_p->vms_spare_min ) {
 		int rc;
 		rc = kvmpool_runspare ( ctx_p );
@@ -191,7 +214,7 @@ int ipv4connect_s ( const char const *host, const uint16_t port ) // TODO: add s
 {
 	struct sockaddr_in dest = {0};
 	int sock;
-	SAFE ( (sock = socket ( AF_INET, SOCK_STREAM, 0 )) < 0, return -1 );
+	SAFE ( ( sock = socket ( AF_INET, SOCK_STREAM, 0 ) ) < 0, return -1 );
 	dest.sin_family = AF_INET;
 	dest.sin_addr.s_addr = htonl ( INADDR_LOOPBACK );
 	dest.sin_port = htons ( port );
@@ -202,11 +225,21 @@ int ipv4connect_s ( const char const *host, const uint16_t port ) // TODO: add s
 vm_t *kvmpool_findsparevm ( ctx_t *ctx_p )
 {
 	int i = 0;
+	int f = 0;
+	debug ( 15, "ctx_p->vms_count == %i", ctx_p->vms_count );
 
-	while ( i < ctx_p->vms_count ) {
-		if ( ctx_p->vms[i].pid != 0 && ctx_p->vms[i].client_fd == 0 )
+	while ( f < ctx_p->vms_count ) {
+		debug ( 25, "ctx_p->vms[i].pid == %i; ctx_p->vms[i].client_fd == %i", ctx_p->vms[i].pid, ctx_p->vms[i].client_fd );
+
+		if ( ctx_p->vms[i].pid == 0 ) {
+			i++;
+			continue;
+		}
+
+		if ( ctx_p->vms[i].client_fd == 0 )
 			return &ctx_p->vms[i];
 
+		f++;
 		i++;
 	}
 
@@ -225,11 +258,11 @@ int kvmpool_closevm ( vm_t *vm )
 		vm->vnc_fd = 0;
 	}
 
-	if ( vm->pid ) {
+	if ( vm->pid > 0 ) {
 		kill ( vm->pid, 9 );
 		int status = 0;
 		waitpid ( vm->pid, &status, 0 );
-		vm->pid = 0;
+		vm->pid = -1;
 	}
 
 	if ( vm->buf != NULL ) {
@@ -237,50 +270,52 @@ int kvmpool_closevm ( vm_t *vm )
 		vm->buf = NULL;
 	}
 
-	memset ( vm, 0, sizeof ( *vm ) );
 	return 0;
 }
 
 static inline int passthrough_dataportion ( int dst, int src, char *buf )
 {
 	int r;
-	debug(8, "passthrough_dataportion(%i, %i, buf)", dst, src);
+	debug ( 8, "passthrough_dataportion(%i, %i, buf)", dst, src );
 
 	while ( 1 ) {
 		int s;
-		debug(9,  "recv(%i, buf, %i, 0x%o)", src, KVMPOOL_NET_BUFSIZE, MSG_DONTWAIT);
+		debug ( 9,  "recv(%i, buf, %i, 0x%o)", src, KVMPOOL_NET_BUFSIZE, MSG_DONTWAIT );
 		errno = 0;
 		r = recv ( src, buf, KVMPOOL_NET_BUFSIZE, MSG_DONTWAIT );
-		debug(10, "recv() -> %i", r);
+		debug ( 10, "recv() -> %i", r );
 
 		if ( r == 0 )
 			return -1;
 
-		if (errno == EAGAIN)
+		if ( errno == EAGAIN )
 			break;
 
 		if ( r < 0 ) {
-			error("got error while receiving from fd == %i", src);
+			error ( "got error while receiving from fd == %i", src );
 			return r;
 		}
 
-		debug(9, "send(%i, buf, %i, 0x%o)", dst, r, MSG_DONTWAIT);
+		debug ( 9, "send(%i, buf, %i, 0x%o)", dst, r, MSG_DONTWAIT );
 		s = send ( dst, buf, r, MSG_DONTWAIT );
 
 		if ( s < 0 ) {
-			error("got error while sending to fd == %i", dst);
+			error ( "got error while sending to fd == %i", dst );
 			return s;
 		}
 
 		if ( s != r ) {
-			error("sent (%i) != received (%i)", s, r);
+			error ( "sent (%i) != received (%i)", s, r );
 			return -1;
 		}
 	};
 
-	debug(9, "finish");
+	debug ( 9, "finish" );
+
 	return 0;
 }
+
+pthread_mutex_t kvmpool_globalmutex;
 
 void *kvmpool_connectionhandler ( void *_vm )
 {
@@ -289,7 +324,7 @@ void *kvmpool_connectionhandler ( void *_vm )
 	int vnc_fd = 0;
 	int connect_try = 0;
 
-	while ( 1 ) {
+	while ( vm->pid > 0 ) {
 		vnc_fd = ipv4connect_s ( "127.0.0.1", vm->vnc_id + 5900 );
 
 		if ( vnc_fd > 0 )
@@ -305,19 +340,24 @@ void *kvmpool_connectionhandler ( void *_vm )
 		connect_try++;
 	};
 
+	pthread_mutex_lock ( &kvmpool_globalmutex );
+
 	vm->vnc_fd = vnc_fd;
+
+	pthread_mutex_unlock ( &kvmpool_globalmutex );
 
 	int max_fd = MAX ( vm->client_fd, vm->vnc_fd ) + 1;
 
 	debug ( 3, "vm->client_fd == %i; vm->vnc_fd == %i", vm->client_fd, vm->vnc_fd );
+
 	while ( vm->client_fd && vm->vnc_fd ) {
 		fd_set rfds;
 		FD_ZERO ( &rfds );
 		FD_SET ( vm->client_fd, &rfds );
 		FD_SET ( vm->vnc_fd, &rfds );
-		debug(7, "select(): vm->client_fd == %i; vm->vnc_fd == %i", vm->client_fd, vm->vnc_fd);
+		debug ( 7, "select(): vm->client_fd == %i; vm->vnc_fd == %i", vm->client_fd, vm->vnc_fd );
 		int sret = select ( max_fd, &rfds, NULL, NULL, NULL );
-		debug(8, "select() -> %i", sret);
+		debug ( 8, "select() -> %i", sret );
 
 		if ( !sret )
 			continue;
@@ -325,7 +365,8 @@ void *kvmpool_connectionhandler ( void *_vm )
 		if ( sret < 0 )
 			break;
 
-		debug(7, "FD_ISSET()s");
+		debug ( 7, "FD_ISSET()s" );
+
 		if ( FD_ISSET ( vm->client_fd, &rfds ) )
 			if ( passthrough_dataportion ( vm->vnc_fd, vm->client_fd, vm->buf ) )
 				break;
@@ -336,16 +377,21 @@ void *kvmpool_connectionhandler ( void *_vm )
 	}
 
 	debug ( 3, "finish" );
+	pthread_mutex_lock ( &kvmpool_globalmutex );
 	kvmpool_closevm ( vm );
+	pthread_mutex_unlock ( &kvmpool_globalmutex );
 	return NULL;
 }
 
 int kvmpool_attach ( ctx_t *ctx_p, int client_fd )
 {
-	debug ( 3, "" );
 	vm_t *vm = kvmpool_findsparevm ( ctx_p );
+	debug ( 3, "vm == %p", vm );
+
+	if ( vm == NULL )
+		return ENOMEM;
+
 	ctx_p->vms_spare_count--;
-	critical_on ( vm == NULL );
 	vm->client_fd = client_fd;
 	vm->buf = xmalloc ( KVMPOOL_NET_BUFSIZE );
 	pthread_create ( &vm->handler, NULL, kvmpool_connectionhandler, vm );
@@ -354,20 +400,57 @@ int kvmpool_attach ( ctx_t *ctx_p, int client_fd )
 
 int kvmpool_gc ( ctx_t *ctx_p )
 {
+	debug ( 23, "start: ctx_p->vms_count == %i; ctx_p->vms_spare_count == %i", ctx_p->vms_count, ctx_p->vms_spare_count );
 	int i = 0;
+	int f = 0;
 
-	while ( i < ctx_p->vms_count ) {
+	while ( f < ctx_p->vms_count ) {
+		debug ( 30, "ctx_p->vms[%i].pid: %i; ctx_p->vms[%i].vnc_id: %i", i, ctx_p->vms[i].pid, i, ctx_p->vms[i].vnc_id );
+
 		if ( ctx_p->vms[i].pid == 0 ) {
-			pthread_join ( ctx_p->vms[i].handler, NULL );
-			memcpy ( &ctx_p->vms[i], &ctx_p->vms[ctx_p->vms_count--], sizeof ( *ctx_p->vms ) );
+			i++;
+			continue;
 		}
 
+		if ( ctx_p->vms[i].pid == -1 ) {
+			ctx_p->vms[i].pid = 0;
+			pthread_join ( ctx_p->vms[i].handler, NULL );
+			ctx_p->vms_count--;
+			//if (i != ctx_p->vms_count)
+			//	memcpy ( &ctx_p->vms[i], &ctx_p->vms[ctx_p->vms_count], sizeof ( *ctx_p->vms ) );
+		}
+
+		f++;
 		i++;
 	}
 
-	debug(5, "ctx_p->vms_count == %i; ctx_p->vms_spare_count == %i", ctx_p->vms_count, ctx_p->vms_spare_count);
-
+	debug ( 20, "finish: ctx_p->vms_count == %i; ctx_p->vms_spare_count == %i", ctx_p->vms_count, ctx_p->vms_spare_count );
 	return 0;
+}
+
+int kvmpool_idle ( ctx_t *ctx_p )
+{
+	SAFE ( kvmpool_gc ( ctx_p ), ( void ) 0 );
+	SAFE ( kvmpool_prepare_spare_vms ( ctx_p ) , ( void ) 0 );
+	return 0;
+}
+
+void *kvmpool_idlehandler ( void *_ctx_p )
+{
+	ctx_t *ctx_p = _ctx_p;
+	int i = 0;
+
+	while ( ctx_p->state == STATE_RUNNING ) {
+		usleep ( 100000 );
+
+		if ( ! ( i++ % 10 ) ) {
+			pthread_mutex_lock ( &kvmpool_globalmutex );
+			kvmpool_idle ( ctx_p );
+			pthread_mutex_unlock ( &kvmpool_globalmutex );
+		}
+	}
+
+	return NULL;
 }
 
 int kvmpool ( ctx_t *ctx_p )
@@ -377,6 +460,8 @@ int kvmpool ( ctx_t *ctx_p )
 	SAFE ( kvmpool_prepare_spare_vms ( ctx_p ) , return _SAFE_rc );
 	ctx_p->listen_fd = ipv4listen ( ctx_p->listen_addr );
 	ctx_p->state = STATE_RUNNING;
+	pthread_t idlehandler;
+	pthread_create ( &idlehandler, NULL, kvmpool_idlehandler, ctx_p );
 
 	while ( ctx_p->state == STATE_RUNNING ) {
 		int client_fd = accept ( ctx_p->listen_fd, NULL, NULL );
@@ -386,14 +471,23 @@ int kvmpool ( ctx_t *ctx_p )
 			continue;
 		}
 
-		kvmpool_gc ( ctx_p );
+		pthread_mutex_lock ( &kvmpool_globalmutex );
+		kvmpool_idle ( ctx_p );
 
 		if ( ctx_p->vms_spare_count == 0 )
-			critical_on ( kvmpool_runspare ( ctx_p ) );
+			if ( kvmpool_runspare ( ctx_p ) ) {
+				close ( client_fd );
+				pthread_mutex_unlock ( &kvmpool_globalmutex );
+				continue;
+			}
 
-		critical_on ( kvmpool_attach ( ctx_p, client_fd ) );
+		if ( kvmpool_attach ( ctx_p, client_fd ) )
+			close ( client_fd );
+
+		pthread_mutex_unlock ( &kvmpool_globalmutex );
 	}
 
+	ctx_p->state = STATE_EXIT;
 	int i = 0;
 
 	while ( i < ctx_p->vms_count )
@@ -401,11 +495,11 @@ int kvmpool ( ctx_t *ctx_p )
 
 	ctx_p->vms_count = 0;
 	ctx_p->vms_spare_count = 0;
-	ctx_p->state = STATE_EXIT;
 	close ( ctx_p->listen_fd );
 	free ( ctx_p->vms );
 	ctx_p->vms = NULL;
 	debug ( 2, "finish" );
+	pthread_join ( idlehandler, NULL );
 	return 0;
 }
 
